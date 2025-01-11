@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <strings.h>
 #include <sqlite3.h>
+#include <ctype.h>
 
 // return status code
 
@@ -29,6 +30,15 @@ struct recipe {
   char *steps;
 };
 
+void format_title(char *title)
+{
+  if (title == NULL || title[0] == '\0') return;
+  title[0] = toupper(title[0]);
+  for (int i = 1; title[i] != '\0'; ++i) {
+    title[i] = tolower(title[i]);
+  }
+}
+
 void initialize_colors()
 {
   start_color();
@@ -47,13 +57,13 @@ int main(void)
   int rc = sqlite3_open(db_name, &db);
 
   const char sql[] = \
-      "CREATE TABLE IF NOT EXISTS RECIPES("  \
-      "ID INTEGER PRIMARY KEY AUTOINCREMENT," \
-      "NAME TEXT NOT NULL," \
-      "DESCRIPTION TEXT NOT NULL," \
-      "INGREDIENTS TEXT NOT NULL," \
-      "STEPS TEXT NOT NULL," \
-      "METADATA TEXT NOT NULL);";
+    "CREATE TABLE IF NOT EXISTS RECIPES("  \
+    "ID INTEGER PRIMARY KEY AUTOINCREMENT," \
+    "NAME TEXT NOT NULL," \
+    "DESCRIPTION TEXT NOT NULL," \
+    "INGREDIENTS TEXT NOT NULL," \
+    "STEPS TEXT NOT NULL," \
+    "METADATA TEXT NOT NULL);";
 
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot open database %s\n", sqlite3_errmsg(db));
@@ -66,6 +76,7 @@ int main(void)
 
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot execute statement %s\n", exec_err_msg);
+    sqlite3_close(db);
     return 1;
   }
 
@@ -120,6 +131,31 @@ int main(void)
   // all the columns of the table showing
   // display database as a list on ncurses when user clicks enter it
   // splits the screen and shows the menu on the right
+  rc = sqlite3_prepare_v2(db, "pragma table_info ('RECIPES')", -1, &stmt, NULL);
+
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Failed to fetch table info: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    return 1;
+  }
+
+  char *column_names[6];
+  int column_index = 0;
+
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    const char *column_name = (const char *)sqlite3_column_text(stmt, 1);
+    if (column_name) {
+      column_names[column_index] = (char *)column_name;
+      column_index++;
+    }
+  }
+
+  // TODO: take this and put it in the title. idk if it would be easier to find
+  // something where I can just take the full table and put it in ncurses.
+  for (int i = 1; i < column_index; ++i) {
+    format_title(column_names[i]);
+    printw("Column %d: %s \n", i, column_names[i]);
+  }
 
 
   // wrefresh(window);
@@ -128,6 +164,7 @@ int main(void)
   wgetch(window);
   endwin();
 
+  sqlite3_finalize(stmt);
   sqlite3_close(db);
   return 0;
 }

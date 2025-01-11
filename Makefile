@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I./include -std=gnu99 -Wall -g #-DDEBUG
+CFLAGS=-I./include -std=gnu99 -Wall -Wextra -g #-DDEBUG
 LDFLAGS=-lncurses -lsqlite3
 
 INC=./include
