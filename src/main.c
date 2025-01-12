@@ -63,8 +63,6 @@ void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
   }
   mvwprintw(win, 0, num_cols * 22, "|");
 
-  mvwprintw(win, 1, 0, "+----------------------+----------------------+----------------------+----------------------+");
-
   row = 2;
   while (sqlite3_step(stmt) == SQLITE_ROW) {
     if (row >= MAX_ROWS) break;
