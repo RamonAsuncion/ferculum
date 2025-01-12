@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 #define MAX_ROWS 20
-#define MAX_COLS 10
+#define MAX_COLS 6
 
 void init_ncurses()
 {
@@ -36,22 +36,8 @@ WINDOW *setup_window()
   return win;
 }
 
-void format_title(char *title)
-{
-  if (title == NULL || title[0] == '\0') return;
-
-  title[0] = toupper(title[0]);
-
-  for (int i = 1; title[i] != '\0'; ++i) {
-    title[i] = tolower(title[i]);
-  }
-}
-
 void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
 {
-
-  // todo: display column names again. also figure out how it should be displayed
-  // I think I can vertical lines all the way around.
   sqlite3_stmt *stmt;
   int rc;
   int row = 0;
@@ -63,10 +49,27 @@ void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
     return;
   }
 
+  int num_cols = sqlite3_column_count(stmt);
+
+  for (int col = 0; col < num_cols; ++col) {
+    const char *col_name = sqlite3_column_name(stmt, col);
+
+    char col_name_copy[256];
+    strncpy(col_name_copy, col_name, sizeof(col_name_copy) - 1);
+    col_name_copy[sizeof(col_name_copy) - 1] = '\0';
+    col_name_copy[0] = toupper(col_name_copy[0]);
+
+    mvwprintw(win, 0, col * 22, "| %-20s ", col_name_copy);
+  }
+  mvwprintw(win, 0, num_cols * 22, "|");
+
+  mvwprintw(win, 1, 0, "+----------------------+----------------------+----------------------+----------------------+");
+
+  row = 2;
   while (sqlite3_step(stmt) == SQLITE_ROW) {
     if (row >= MAX_ROWS) break;
 
-    for(int col = 0; col < sqlite3_column_count(stmt); ++col) {
+    for(int col = 0; col < num_cols; ++col) {
       if (col >= MAX_COLS) break;
 
       const char *data = (const char*)sqlite3_column_text(stmt, col);
@@ -123,24 +126,23 @@ void display_menu(WINDOW *win)
 void setup_sqlite_database(const char *db_name, sqlite3 **db)
 {
   int rc = sqlite3_open(db_name, db);
-
-  const char sql[] = \
-    "CREATE TABLE IF NOT EXISTS RECIPES("  \
-    "ID INTEGER PRIMARY KEY AUTOINCREMENT," \
-    "NAME TEXT NOT NULL," \
-    "DESCRIPTION TEXT NOT NULL," \
-    "INGREDIENTS TEXT NOT NULL," \
-    "STEPS TEXT NOT NULL," \
-    "METADATA TEXT NOT NULL);";
-
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot open database %s\n", sqlite3_errmsg(*db));
     sqlite3_close(*db);
     exit(EXIT_FAILURE);
   }
 
-  rc = sqlite3_exec(*db, sql, NULL, NULL, NULL);
+  const char sql[] = \
+    "CREATE TABLE IF NOT EXISTS recipes ("  \
+    "id INTEGER PRIMARY KEY AUTOINCREMENT," \
+    "name TEXT," \
+    "description TEXT," \
+    "ingredients TEXT," \
+    "steps TEXT," \
+    "metadata TEXT);";
 
+
+  rc = sqlite3_exec(*db, sql, NULL, NULL, NULL);
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot execute statement %s\n", sqlite3_errmsg(*db));
     sqlite3_close(*db);
@@ -152,18 +154,24 @@ void setup_sqlite_database(const char *db_name, sqlite3 **db)
 int main(void)
 {
   WINDOW *window;
-
   sqlite3 *db;
-  const char *db_filename = "recipes.db";
-  const char *sql_query = "SELECT * FROM RECIPES";
 
-  setup_sqlite_database(db_filename, &db);
+  setup_sqlite_database("recipes.db", &db);
+
+  const char *insert_query = "INSERT INTO recipes (id, name, description, ingredients, steps, metadata) VALUES (1, 'Test Recipe', 'A simple test recipe', 'Flour, Sugar', 'Mix and bake', 'None');";
+  sqlite3_exec(db, insert_query, NULL, NULL, NULL);
+
+
   init_ncurses();
+
 
   window = setup_window();
 
   display_title(window);
   display_menu(window);
+
+
+  const char *sql_query = "SELECT * FROM recipes";
   display_table(window, db, sql_query);
 
   wgetch(window);
