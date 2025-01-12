@@ -49,9 +49,12 @@ void format_title(char *title)
 
 void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
 {
+
+  // todo: display column names again. also figure out how it should be displayed
+  // I think I can vertical lines all the way around.
   sqlite3_stmt *stmt;
   int rc;
-  int row = 1;
+  int row = 0;
 
   rc = sqlite3_prepare_v2(db, sql_query, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
@@ -61,18 +64,25 @@ void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
   }
 
   while (sqlite3_step(stmt) == SQLITE_ROW) {
+    if (row >= MAX_ROWS) break;
+
     for(int col = 0; col < sqlite3_column_count(stmt); ++col) {
+      if (col >= MAX_COLS) break;
+
       const char *data = (const char*)sqlite3_column_text(stmt, col);
       if (data) {
+        char buffer[21];
+        snprintf(buffer, sizeof(buffer), "%-*s", 20, data);
         mvwprintw(win, row, col * 20, "%-*s", 20, data);
+      } else {
+        mvwprintw(win, row, col * 20, "%-*s", 20, "N/A");
       }
     }
     row++;
-    if (row > MAX_ROWS) break;
   }
 
   sqlite3_finalize(stmt);
-  //wrefresh(win);
+  wrefresh(win);
 }
 
 void display_title(WINDOW *win)
@@ -145,6 +155,7 @@ int main(void)
 
   sqlite3 *db;
   const char *db_filename = "recipes.db";
+  const char *sql_query = "SELECT * FROM RECIPES";
 
   setup_sqlite_database(db_filename, &db);
   init_ncurses();
@@ -153,6 +164,7 @@ int main(void)
 
   display_title(window);
   display_menu(window);
+  display_table(window, db, sql_query);
 
   wgetch(window);
 
