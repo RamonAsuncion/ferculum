@@ -1,60 +1,118 @@
 #include <ncurses.h>
 #include <stdbool.h>
-#include <strings.h>
+#include <string.h>
 #include <sqlite3.h>
 #include <ctype.h>
+#include <stdlib.h>
 
-// return status code
+#define MAX_ROWS 20
+#define MAX_COLS 10
 
-// adding a recipe
-// 1. name
-// 2. ingredients
-// 3. steps
-// 4. metadata
-// How do I want to display this?
+void init_ncurses()
+{
+  initscr();
+  cbreak();
+  curs_set(0);
+  noecho();
+  keypad(stdscr, true);
+}
 
+WINDOW *setup_window()
+{
+  int x_max, y_max;
+  int y_top, y_bottom, x_top, x_bottom;
 
-// one screen with a table like? and when you press enter it splits it into
-// two where you can see the different recipes on the left and the
-// specific recipe on the right?
+  getmaxyx(stdscr, y_max, x_max);
 
-#define ARRAY_SIZE(_x) (sizeof(_x) / sizeof(_x[0]))
+  y_bottom = y_max - 2;
+  x_bottom = x_max - 4;
+  y_top = 1;
+  x_top = 2;
 
-#define HIGHLIGHT_PAIR 1
-#define NORMAL_PAIR    2
+  WINDOW *win = newwin(y_bottom, x_bottom, y_top, x_top);
+  box(win, 0, 0);
+  wrefresh(win);
 
-struct recipe {
-  char *name;
-  char *description;
-  char *ingredents;
-  char *steps;
-};
+  return win;
+}
 
 void format_title(char *title)
 {
   if (title == NULL || title[0] == '\0') return;
+
   title[0] = toupper(title[0]);
+
   for (int i = 1; title[i] != '\0'; ++i) {
     title[i] = tolower(title[i]);
   }
 }
 
-void initialize_colors()
+void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
 {
-  start_color();
-  init_pair(HIGHLIGHT_PAIR, COLOR_BLACK, COLOR_WHITE);
-  init_pair(NORMAL_PAIR, COLOR_WHITE, COLOR_BLACK);
+  sqlite3_stmt *stmt;
+  int rc;
+  int row = 1;
+
+  rc = sqlite3_prepare_v2(db, sql_query, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Failed to fetch table info: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    return;
+  }
+
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    for(int col = 0; col < sqlite3_column_count(stmt); ++col) {
+      const char *data = (const char*)sqlite3_column_text(stmt, col);
+      if (data) {
+        mvwprintw(win, row, col * 20, "%-*s", 20, data);
+      }
+    }
+    row++;
+    if (row > MAX_ROWS) break;
+  }
+
+  sqlite3_finalize(stmt);
+  //wrefresh(win);
 }
 
-int main(void)
+void display_title(WINDOW *win)
 {
-  struct recipe *recipes = NULL;
-  int recipe_count = 0;
+  const char *title = "Recipe Manager";
+  int title_length = strlen(title);
 
-  sqlite3 *db;
-  sqlite3_stmt *stmt;
-  char *db_name = "test.db";
-  int rc = sqlite3_open(db_name, &db);
+  int x_max = getmaxx(win);
+  int title_x_pos = (x_max - title_length) / 2;
+
+  mvwprintw(win, 0, title_x_pos, "%s", title);
+  wrefresh(win);
+}
+
+void display_menu(WINDOW *win)
+{
+  char *menu_options[] = {
+    "Show",
+    "Add",
+    "Edit",
+    "Delete",
+    "Copy",
+  };
+
+  int y_max = getmaxy(win);
+  int menu_count = sizeof(menu_options) / sizeof(menu_options[0]);
+  int menu_start_y = y_max - 1;
+  int menu_start_x = 4;
+
+  for (int i = 0; i < menu_count; ++i) {
+    mvwprintw(win, menu_start_y, menu_start_x, "%s", menu_options[i]);
+    menu_start_x += strlen(menu_options[i]) + 2;
+  }
+
+  wrefresh(win);
+}
+
+void setup_sqlite_database(const char *db_name, sqlite3 **db)
+{
+  int rc = sqlite3_open(db_name, db);
 
   const char sql[] = \
     "CREATE TABLE IF NOT EXISTS RECIPES("  \
@@ -66,106 +124,41 @@ int main(void)
     "METADATA TEXT NOT NULL);";
 
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "Cannot open database %s\n", sqlite3_errmsg(db));
-    sqlite3_close(db);
-    return 1;
+    fprintf(stderr, "Cannot open database %s\n", sqlite3_errmsg(*db));
+    sqlite3_close(*db);
+    exit(EXIT_FAILURE);
   }
 
-  char *exec_err_msg;
-  rc = sqlite3_exec(db, sql, NULL, NULL, &exec_err_msg);
+  rc = sqlite3_exec(*db, sql, NULL, NULL, NULL);
 
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "Cannot execute statement %s\n", exec_err_msg);
-    sqlite3_close(db);
-    return 1;
+    fprintf(stderr, "Cannot execute statement %s\n", sqlite3_errmsg(*db));
+    sqlite3_close(*db);
+    exit(EXIT_FAILURE);
   }
+}
 
+
+int main(void)
+{
   WINDOW *window;
-  int x_max, y_max;
-  int y_top, y_bottom, x_top, x_bottom;
 
-  initscr();
-  cbreak();
-  curs_set(0);
-  noecho();
-  keypad(stdscr, true);
+  sqlite3 *db;
+  const char *db_filename = "recipes.db";
 
-  initialize_colors();
+  setup_sqlite_database(db_filename, &db);
+  init_ncurses();
 
-  getmaxyx(stdscr, y_max, x_max);
+  window = setup_window();
 
-  y_bottom = y_max - 2;
-  x_bottom = x_max - 4;
-  y_top = 1;
-  x_top = 2;
-
-  window = newwin(y_bottom, x_bottom, y_top, x_top);
-  box(window, 0, 0);
-
-  const char *title = "Recipe Manager";
-  int title_length = strlen(title);
-  int title_x_pos = (x_max - title_length) / 2;
-  mvwprintw(window, 0, title_x_pos, "%s", title);
-
-  // wrefresh(window);
-
-  char *menu_options[] = {
-    "Show",
-    "Add",
-    "Edit",
-    "Delete",
-    "Copy",
-  };
-  int menu_count = ARRAY_SIZE(menu_options);
-  int menu_item = 0;
-
-  int menu_start_y = y_max - 1;
-  int menu_start_x = 4; // FIXME: temporary value
-
-  // FIXME: use menu_item to increment index
-  for (int i = 0; i < menu_count; ++i) {
-    mvprintw(menu_start_y, menu_start_x, "%s", menu_options[i]);
-    menu_start_x += strlen(menu_options[i]) + 2;
-  }
-
-  // all the columns of the table showing
-  // display database as a list on ncurses when user clicks enter it
-  // splits the screen and shows the menu on the right
-  rc = sqlite3_prepare_v2(db, "pragma table_info ('RECIPES')", -1, &stmt, NULL);
-
-  if (rc != SQLITE_OK) {
-    fprintf(stderr, "Failed to fetch table info: %s\n", sqlite3_errmsg(db));
-    sqlite3_close(db);
-    return 1;
-  }
-
-  char *column_names[6];
-  int column_index = 0;
-
-  while (sqlite3_step(stmt) == SQLITE_ROW) {
-    const char *column_name = (const char *)sqlite3_column_text(stmt, 1);
-    if (column_name) {
-      column_names[column_index] = (char *)column_name;
-      column_index++;
-    }
-  }
-
-  // TODO: take this and put it in the title. idk if it would be easier to find
-  // something where I can just take the full table and put it in ncurses.
-  for (int i = 1; i < column_index; ++i) {
-    format_title(column_names[i]);
-    printw("Column %d: %s \n", i, column_names[i]);
-  }
-
-
-  // wrefresh(window);
-  refresh();
+  display_title(window);
+  display_menu(window);
 
   wgetch(window);
-  endwin();
 
-  sqlite3_finalize(stmt);
+  endwin();
   sqlite3_close(db);
-  return 0;
+
+  return EXIT_SUCCESS;
 }
 
