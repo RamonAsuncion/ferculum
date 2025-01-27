@@ -1,0 +1,17 @@
+- [ ] Add recipes
+  - [ ] name, ingredients, steps, and other metadata (time? or type?)
+- [ ] Edit recipes
+- [ ] Delete recipes
+- [ ] Search Recipes (fuzzy matching).
+  - [ ] By Recipe name.
+  - [ ] By Ingredient(s)
+- [ ] Export recipes (using fpdf)
+- [ ] Store data in SQLite. (using JSON?)
+
+- Other:
+  - Categorization
+  - Favorites
+  - Shopping List
+  - Import Recipes
+
+

@@ -51,36 +51,33 @@ void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
 
   int num_cols = sqlite3_column_count(stmt);
 
-  for (int col = 0; col < num_cols; ++col) {
-    const char *col_name = sqlite3_column_name(stmt, col);
+  //for (int col = 0; col < num_cols; ++col) {
+  //  const char *col_name = sqlite3_column_name(stmt, col);
 
-    char col_name_copy[256];
-    strncpy(col_name_copy, col_name, sizeof(col_name_copy) - 1);
-    col_name_copy[sizeof(col_name_copy) - 1] = '\0';
-    col_name_copy[0] = toupper(col_name_copy[0]);
+  //  char col_name_copy[256];
+  //  strncpy(col_name_copy, col_name, sizeof(col_name_copy) - 1);
+  //  col_name_copy[sizeof(col_name_copy) - 1] = '\0';
+  //  col_name_copy[0] = toupper(col_name_copy[0]);
 
-    mvwprintw(win, 0, col * 22, "| %-20s ", col_name_copy);
-  }
-  mvwprintw(win, 0, num_cols * 22, "|");
+  //  mvwprintw(win, row, col * 22 + 1, "%-20s", col_name_copy);
+  //  mvwprintw(win, row, (col + 1) * 22, "|");
+  //}
 
   row = 2;
-  while (sqlite3_step(stmt) == SQLITE_ROW) {
-    if (row >= MAX_ROWS) break;
+  //while (sqlite3_step(stmt) == SQLITE_ROW) {
+  //  if (row >= MAX_ROWS) break;
 
-    for(int col = 0; col < num_cols; ++col) {
-      if (col >= MAX_COLS) break;
+  //  for(int col = 0; col < num_cols; ++col) {
+  //    if (col >= MAX_COLS) break;
 
-      const char *data = (const char*)sqlite3_column_text(stmt, col);
-      if (data) {
-        char buffer[21];
-        snprintf(buffer, sizeof(buffer), "%-*s", 20, data);
-        mvwprintw(win, row, col * 20, "%-*s", 20, data);
-      } else {
-        mvwprintw(win, row, col * 20, "%-*s", 20, "N/A");
-      }
-    }
-    row++;
-  }
+  //    const char *data = (const char*)sqlite3_column_text(stmt, col);
+
+  //    mvwprintw(win, row, col * 22 + 1, "%-*s", 20, data ? data : "N/A");
+  //    mvwprintw(win, row, (col + 1) * 22, "|");
+
+  //  }
+  //  row++;
+  //}
 
   sqlite3_finalize(stmt);
   wrefresh(win);
@@ -114,8 +111,11 @@ void display_menu(WINDOW *win)
   int menu_start_x = 4;
 
   for (int i = 0; i < menu_count; ++i) {
-    mvwprintw(win, menu_start_y, menu_start_x, "%s", menu_options[i]);
-    menu_start_x += strlen(menu_options[i]) + 2;
+    wattron(win, A_BOLD | A_UNDERLINE);
+    mvwprintw(win, menu_start_y, menu_start_x, "%c", menu_options[i][0]);
+    wattroff(win, A_BOLD | A_UNDERLINE);
+    mvwprintw(win, menu_start_y, menu_start_x + 1, "%s", menu_options[i] + 1);
+    menu_start_x += strlen(menu_options[i]) + 4;
   }
 
   wrefresh(win);
@@ -139,7 +139,6 @@ void setup_sqlite_database(const char *db_name, sqlite3 **db)
     "steps TEXT," \
     "metadata TEXT);";
 
-
   rc = sqlite3_exec(*db, sql, NULL, NULL, NULL);
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot execute statement %s\n", sqlite3_errmsg(*db));
@@ -147,7 +146,6 @@ void setup_sqlite_database(const char *db_name, sqlite3 **db)
     exit(EXIT_FAILURE);
   }
 }
-
 
 int main(void)
 {
@@ -159,9 +157,7 @@ int main(void)
   const char *insert_query = "INSERT INTO recipes (id, name, description, ingredients, steps, metadata) VALUES (1, 'Test Recipe', 'A simple test recipe', 'Flour, Sugar', 'Mix and bake', 'None');";
   sqlite3_exec(db, insert_query, NULL, NULL, NULL);
 
-
   init_ncurses();
-
 
   window = setup_window();
 
@@ -177,6 +173,6 @@ int main(void)
   endwin();
   sqlite3_close(db);
 
-  return EXIT_SUCCESS;
+  return 0;
 }
 
