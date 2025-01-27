@@ -147,6 +147,14 @@ void setup_sqlite_database(const char *db_name, sqlite3 **db)
   }
 }
 
+void clean(void)
+{
+  echo();
+  nl();
+  nocbreak();
+  endwin();
+}
+
 int main(void)
 {
   WINDOW *window;
@@ -158,21 +166,35 @@ int main(void)
   sqlite3_exec(db, insert_query, NULL, NULL, NULL);
 
   init_ncurses();
+  atexit(clean);
 
   window = setup_window();
 
   display_title(window);
   display_menu(window);
 
-
   const char *sql_query = "SELECT * FROM recipes";
   display_table(window, db, sql_query);
 
-  wgetch(window);
+  char ch;
+  while ((ch = wgetch(window)) != 'q') {
+    switch (ch) {
+      case 'S': // show
+        break;
+      case 'A': // add
+        break;
+      case 'E': // edit
+        break;
+      case 'D': // delete
+        break;
+      case 'C': // copy
+        break;
+      default:
+        break;
+    }
+  }
 
-  endwin();
   sqlite3_close(db);
-
   return 0;
 }
 
