@@ -1,9 +1,10 @@
 #include <ncurses.h>
 #include <string.h>
+#include <stdlib.h>
 
 enum dialog_option {
-  YES,
-  NO,
+  YES = 0,
+  NO = 1,
 };
 
 bool confirm_exit()
@@ -31,23 +32,21 @@ bool confirm_exit()
 
   const char *options[] = { "[Yes]", "[No]" };
 
+  keypad(exit_win, TRUE);
+  wrefresh(exit_win);
+
   for (;;) {
     int first_option_pos = (box_width - strlen(options[0]) - strlen(options[1]) - 1) / 2;
     int second_option_pos = (box_width + strlen(options[0]) + 1) / 2;
 
-    //if (initial_text_load) {
     mvwprintw(exit_win, 3, first_option_pos, "%s", options[0]);
     mvwprintw(exit_win, 3, second_option_pos, "%s", options[1]);
-    //initial_text_load = false;
-    //}
 
     wattron(exit_win, A_REVERSE);
     mvwprintw(exit_win, 3,
       (current_choice == YES) ? first_option_pos : second_option_pos,
       "%s", options[current_choice]);
     wattroff(exit_win, A_REVERSE);
-
-    mvwprintw(exit_win, 4, 1, "Key pressed: %d", ch);
 
     wrefresh(exit_win);
 
@@ -71,7 +70,9 @@ int main(void) {
   initscr();
   cbreak();
   noecho();
+  curs_set(0);
   keypad(stdscr, TRUE);
-  confirm_exit();
+  bool should_exit = confirm_exit();
   endwin();
+  return should_exit ? EXIT_SUCCESS : EXIT_FAILURE;
 }
