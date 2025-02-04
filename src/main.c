@@ -4,9 +4,15 @@
 #include <sqlite3.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <panel.h>
 
 #define MAX_ROWS 20
 #define MAX_COLS 6
+
+enum dialog_option {
+  YES = 0,
+  NO = 1,
+};
 
 void init_ncurses()
 {
@@ -131,58 +137,70 @@ void display_menu(WINDOW *win, int selected_menu_item)
 
 bool confirm_exit(WINDOW *win)
 {
- int max_y, max_x;
-  getmaxyx(win, max_y, max_x);
+  int max_y, max_x;
+  getmaxyx(stdscr, max_y, max_x);
 
-  int box_height = 5;
-  int box_width = 30;
+  int box_height = 5, box_width = 40;
   int start_x = (max_x - box_width) / 2;
   int start_y = (max_y - box_height) / 2;
 
   WINDOW *exit_win = newwin(box_height, box_width, start_y, start_x);
+  PANEL *exit_panel = new_panel(exit_win);
   box(exit_win, 0, 0);
 
-  const char *question = "Do you really want to exit?";
-  mvwprintw(exit_win, 1, 1, question);
+  const char *question = "Are you sure you want to exit?";
+  int question_x = (box_width - strlen(question)) / 2;
+  mvwprintw(exit_win, 1, question_x, question);
 
-  wrefresh(exit_win);
 
-  int current_choice = 1; // yes
+  PANEL *background_panel = new_panel(win);
+  bottom_panel(background_panel);
+  top_panel(exit_panel);
+
+  update_panels();
+  doupdate();
+
+  enum dialog_option current_choice = YES;
   int ch = 0;
+  const char *options[] = { "[Yes]", "[No]" };
+
+  keypad(exit_win, TRUE);
+
+  int option_spacing = 4;
+  int total_options_width = strlen(options[0]) + strlen(options[1]) + option_spacing;
+  int start_options_x = question_x + (strlen(question) - total_options_width) / 2;
+
+  int first_option_pos = start_options_x;
+  int second_option_pos = first_option_pos + strlen(options[0]) + option_spacing;
 
   for (;;) {
-    const char *yes_option = "[Yes]";
-    const char *no_option = "[No]";
+    mvwprintw(exit_win, 3, first_option_pos, "%s", options[0]);
+    mvwprintw(exit_win, 3, second_option_pos, "%s", options[1]);
 
-    mvwprintw(exit_win, 3, (box_width - strlen(yes_option) - strlen(no_option) - 1) / 2, "%s", yes_option);
-    mvwprintw(exit_win, 3, (box_width + strlen(yes_option) + 1) / 2, "%s", no_option);
+    wattron(exit_win, A_REVERSE);
+    mvwprintw(exit_win, 3,
+      (current_choice == YES) ? first_option_pos : second_option_pos,
+      "%s", options[current_choice]);
+    wattroff(exit_win, A_REVERSE);
 
-    if (current_choice == 1) {
-      wattron(exit_win, A_REVERSE);
-      mvwprintw(exit_win, 3, (box_width - strlen(yes_option) - strlen(no_option) - 1) / 2, "%s", yes_option);
-      wattroff(exit_win, A_REVERSE);
-    } else {
-      wattron(exit_win, A_REVERSE);
-      mvwprintw(exit_win, 3, (box_width + strlen(yes_option) + 1) / 2, "%s", no_option);
-      wattroff(exit_win, A_REVERSE);
-    }
-
-    mvwprintw(exit_win, 4, 1, "Key pressed: %d", ch);
-
-    wrefresh(exit_win);
+    update_panels();
+    doupdate();
 
     ch = wgetch(exit_win);
     switch (ch) {
       case KEY_LEFT:
-        current_choice = 1; // yes
+        current_choice = YES;
         break;
       case KEY_RIGHT:
-        current_choice = 0; // no
+        current_choice = NO;
         break;
       case '\n':
       case KEY_ENTER:
+        del_panel(exit_panel);
         delwin(exit_win);
-        return current_choice == 1;
+        update_panels();
+        doupdate();
+        return current_choice == YES;
     }
   }
 }
@@ -226,9 +244,11 @@ int main(void)
   WINDOW *window;
   sqlite3 *db;
   int selected_menu_item = -1;
+  bool should_exit;
 
   setup_sqlite_database("recipes.db", &db);
 
+  // for debugging purposes
   const char *insert_query = "INSERT INTO recipes (id, name, description, ingredients, steps, metadata) VALUES (1, 'Test Recipe', 'A simple test recipe', 'Flour, Sugar', 'Mix and bake', 'None');";
   sqlite3_exec(db, insert_query, NULL, NULL, NULL);
 
@@ -262,10 +282,13 @@ int main(void)
         selected_menu_item = 4;
         break;
       case 'q': // quit
-        if (confirm_exit(window))
-          break;
-        else
-          continue;
+        should_exit = confirm_exit(window);
+        if (should_exit) {
+          delwin(window);
+          endwin();
+          sqlite3_close(db);
+          return EXIT_SUCCESS;
+        }
         break;
       default:
         selected_menu_item = -1;
@@ -274,6 +297,8 @@ int main(void)
     display_menu(window, selected_menu_item);
   }
 
+  delwin(window);
+  endwin();
   sqlite3_close(db);
   return 0;
 }

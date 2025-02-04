@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-I./include -std=gnu99 -Wall -Wextra -g #-DDEBUG
-LDFLAGS=-lncurses -lsqlite3
+LDFLAGS=-lncurses -lsqlite3 -lpanel
 
 INC=./include
 SRC=./src
