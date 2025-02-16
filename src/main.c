@@ -9,6 +9,8 @@
 #define MAX_ROWS 20
 #define MAX_COLS 6
 
+#define KEY_ESC 27
+
 enum dialog_option {
   YES = 0,
   NO = 1,
@@ -57,33 +59,9 @@ void display_table(WINDOW *win, sqlite3 *db, const char *sql_query)
 
   int num_cols = sqlite3_column_count(stmt);
 
-  //for (int col = 0; col < num_cols; ++col) {
-  //  const char *col_name = sqlite3_column_name(stmt, col);
-
-  //  char col_name_copy[256];
-  //  strncpy(col_name_copy, col_name, sizeof(col_name_copy) - 1);
-  //  col_name_copy[sizeof(col_name_copy) - 1] = '\0';
-  //  col_name_copy[0] = toupper(col_name_copy[0]);
-
-  //  mvwprintw(win, row, col * 22 + 1, "%-20s", col_name_copy);
-  //  mvwprintw(win, row, (col + 1) * 22, "|");
-  //}
-
-  row = 2;
-  //while (sqlite3_step(stmt) == SQLITE_ROW) {
-  //  if (row >= MAX_ROWS) break;
-
-  //  for(int col = 0; col < num_cols; ++col) {
-  //    if (col >= MAX_COLS) break;
-
-  //    const char *data = (const char*)sqlite3_column_text(stmt, col);
-
-  //    mvwprintw(win, row, col * 22 + 1, "%-*s", 20, data ? data : "N/A");
-  //    mvwprintw(win, row, (col + 1) * 22, "|");
-
-  //  }
-  //  row++;
-  //}
+  /**
+    * TODO: Get a table.
+    */
 
   sqlite3_finalize(stmt);
   wrefresh(win);
@@ -118,7 +96,7 @@ void display_menu(WINDOW *win, int selected_menu_item)
 
   for (int i = 0; i < menu_count; ++i) {
     if (i == selected_menu_item) {
-      wattron(win, A_REVERSE | A_BOLD | A_UNDERLINE); // FIXME: why isn't it A_UNDERLINE when active? (https://www.google.com/url?sa=i&url=https%3A%2F%2Fgnosis.cx%2Fpublish%2Fprogramming%2Fcharming_python_6.html&psig=AOvVaw2sEX3ovu3axRFTijJ0H9cI&ust=1738076623421000&source=images&cd=vfe&opi=89978449&ved=0CBcQjhxqFwoTCLDnrY-WlosDFQAAAAAdAAAAABBY)
+      wattron(win, A_REVERSE | A_BOLD | A_UNDERLINE); // todo: is A_UNDERLINE doing anything?
       mvwprintw(win, menu_start_y, menu_start_x, "%c", menu_options[i][0]);
       wattroff(win, A_REVERSE | A_BOLD | A_UNDERLINE);
       mvwprintw(win, menu_start_y, menu_start_x + 1, "%s", menu_options[i] + 1);
@@ -151,7 +129,6 @@ bool confirm_exit(WINDOW *win)
   const char *question = "Are you sure you want to exit?";
   int question_x = (box_width - strlen(question)) / 2;
   mvwprintw(exit_win, 1, question_x, question);
-
 
   PANEL *background_panel = new_panel(win);
   bottom_panel(background_panel);
@@ -263,8 +240,26 @@ int main(void)
   const char *sql_query = "SELECT * FROM recipes";
   display_table(window, db, sql_query);
 
-  char ch;
+  // TODO: top left add current window size (limit how small you can go)
+  // this should constantly be updating
+
+  int max_x, max_y;
+  int ch;
   while ((ch = tolower(wgetch(window)))) {
+    //if (ch == KEY_RESIZE) {
+    //  delwin(window);
+    //  window = setup_window();
+    //  display_title(window);
+    //  display_menu(window, selected_menu_item);
+    //  clear();
+    //  refresh();
+    //  continue;
+    //}
+
+    //getmaxyx(stdscr, max_y, max_x);
+    //mvprintw(0, 0, "Size: %dx%d ", max_x, max_y);
+    //refresh();
+
     switch (ch) {
       case 's': // show
         selected_menu_item = 0;
@@ -281,6 +276,7 @@ int main(void)
       case 'c': // copy
         selected_menu_item = 4;
         break;
+      case KEY_ESC:
       case 'q': // quit
         should_exit = confirm_exit(window);
         if (should_exit) {
